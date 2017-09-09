@@ -12,6 +12,13 @@ import subprocess
 
 from utils import colors, query_yes_no
 
+
+LOG_VIRTUALENV = "virtualenv-error.log"
+LOG_PIP = "pip-error.log"
+LOG_BOWER = "bower-error.log"
+LOG_GIT = "git-error.log"
+
+
 # Environment variables
 cwd = os.getcwd()
 base_dir = os.path.abspath(os.path.join(os.path.dirname(os.path.realpath(__file__)), ".."))
@@ -22,94 +29,268 @@ template_loader = jinja2.FileSystemLoader(searchpath=os.path.join(base_dir, "tem
 template_env = jinja2.Environment(loader=template_loader)
 
 
+global_vars = {
+    'pyversion': platform.python_version(),
+    'require': colors.WARNING,
+    'enabled': colors.OKGREEN,
+    'disabled': colors.FAIL,
+    'red': colors.FAIL,
+    'end': colors.ENDC,
+}
+
+
+def log_error(logfile='error.log', error="", msg="", exit_on_error=True):
+    if not error:
+        return
+    with open(logfile, 'w') as fd:
+        fd.write(error.decode('utf-8'))
+        print("{red}{msg} Please consult {yellow}{logfile}{red} file for details.{end}".format(
+            msg=msg,
+            logfile=logfile,
+            red=colors.FAIL,
+            yellow=colors.WARNING,
+            end=colors.ENDC
+        ))
+        if exit_on_error:
+            sys.exit(2)
+
+
+class Externals():
+    __bower = None
+    __virtualenv = None
+    __git = "git"
+
+    def __init__(self):
+        self.errors = []
+
+    @property
+    def bower(self):
+        if self.__bower is None:
+            self.__bower = shutil.which('bower')
+        if not self.__bower:
+            self.errors.append('Bower executable could not be found.')
+        return self.__bower
+
+    @property
+    def virtualenv(self):
+        if self.__virtualenv is None:
+            self.__virtualenv = shutil.which('virtualenv')
+        if not self.__virtualenv:
+            self.errors.append('Virtualenv executable could not be found.')
+        return self.__virtualenv
+
+    @property
+    def git(self):
+        return self.__git
+
+    @property
+    def has_errors(self):
+        return len(self.errors) > 0
+
+
+class ProjectTemplate():
+    def __init__(self, skeleton_dir="skel", config_file="config.jinja2"):
+        self.appname = "app"
+        self.errors = []
+        self.skeleton_dir = skeleton_dir
+        self.config_file = config_file
+        self.secret_key = codecs.encode(os.urandom(32), 'hex').decode('utf-8')
+        self.debug = True
+
+        self.externals = Externals()
+
+        self.database = False
+
+        self.bower = []
+        self.virtualenv = False
+        self.git = False
+
+    @property
+    def source_dir(self):
+        return os.path.join(script_dir, self.skeleton_dir)
+
+    @property
+    def static_dir(self):
+        return os.path.join(self.fullpath, 'app', 'static')
+
+    @property
+    def template_var(self):
+        template_var = {
+            'appname': self.appname,
+            'bower': self.bower,
+            'debug': self.debug,
+            'virtualenv': self.virtualenv,
+            'secret_key': self.secret_key,
+            'path': self.fullpath,
+            'database': self.database,
+            'git': self.git,
+        }
+        # bower = None
+        if self.bower:
+            template_var['bower_exe'] = self.externals.bower
+        if self.virtualenv:
+            template_var['virtualenv_exe'] = self.externals.virtualenv
+        return template_var
+
+    @property
+    def config_var(self):
+        return {
+            'secret_key': self.secret_key,
+            'debug': self.debug,
+        }
+
+    @property
+    def template(self):
+        return template_env.get_template(self.config_file)
+
+    def generate_config(self):
+        return generate(self.config_file, self.config_var)
+
+    @property
+    def fullpath(self):
+        return os.path.join(cwd, self.appname)
+
+    @property
+    def venv_dir(self):
+        return os.path.join(self.fullpath, 'venv')
+
+    @property
+    def venv_bin(self):
+        return os.path.join(self.fullpath, 'venv', 'bin')
+
+    @property
+    def pip_bin(self):
+        return os.path.join(self.venv_bin, 'pip')
+
+    @property
+    def requirements(self):
+        return os.path.join(self.fullpath, 'requirements.txt')
+
+    @property
+    def config(self):
+        return os.path.join(self.fullpath, 'config.py')
+
+    @property
+    def gitignore_template(self):
+        return os.path.join(base_dir, 'templates', 'gitignore')
+
+    @property
+    def gitignore(self):
+        return os.path.join(self.fullpath, '.gitignore')
+
+    def install(self):
+        self.copy_skeleton()
+        self.create_config()
+
+        if self.virtualenv:
+            self.install_virtualenv()
+        if self.bower:
+            self.install_bower(bower=self.bower)
+        if self.git:
+            self.install_git()
+
+    def copy_skeleton(self):
+        # Copying the whole skeleton into the new path. Error if the path already exists
+        # TODO error handling here.
+        print('Copying Skeleton...\t\t\t', end="", flush=True)
+        shutil.copytree(self.source_dir, self.fullpath)
+        print("{green}Ok{end}".format(green=colors.OKGREEN, end=colors.ENDC))
+
+    def create_config(self):
+        # Creating the configuration file using the command line arguments
+        print('Creating config file...\t\t\t', end="", flush=True)
+        with open(self.config, 'w') as fd:
+            fd.write(self.generate_config())
+        print("{green}Ok{end}".format(green=colors.OKGREEN, end=colors.ENDC))
+
+    def install_virtualenv(self):
+        # If virtualenv is requested, then create it and install the required libs to work
+        print('Creating the virtualenv...\t\t', end="", flush=True)
+        output, error = subprocess.Popen(
+            [self.externals.virtualenv, self.venv_dir, '--no-site-package'],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+        ).communicate()
+        log_error(
+            LOG_VIRTUALENV,
+            error,
+            "An error occured during the creation of the virtualenv."
+        )
+        print("{green}Ok{end}".format(green=colors.OKGREEN, end=colors.ENDC))
+        self.install_dependencies()
+
+    def install_dependencies(self):
+        print("Installing Python Dependencies...\t", end="", flush=True)
+        output, error = subprocess.Popen(
+            [self.pip_bin, 'install', '-r', self.requirements],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+        ).communicate()
+        log_error(
+            LOG_PIP,
+            error,
+            "An error occured during the installation of dependencies.",
+        )
+        print("{green}Ok{end}".format(green=colors.OKGREEN, end=colors.ENDC))
+
+    def install_bower(self, bower=[]):
+        os.chdir(self.static_dir)
+        for dependency in bower:
+            print("Bower {}...\t\t\t".format(dependency.title()), end="", flush=True)
+            output, error = subprocess.Popen(
+                [self.externals.bower, 'install', dependency],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE
+            ).communicate()
+            log_error(
+                LOG_BOWER,
+                error,
+                "An error occured during the installation of {dep}.".format(
+                    dep=dependency
+                ),
+                False
+            )
+            print("{green}Ok{end}".format(green=colors.OKGREEN, end=colors.ENDC))
+
+    def install_git(self):
+        print('Git Init...\t\t\t\t', end="", flush=True)
+        output, error = subprocess.Popen(
+            [self.externals.git, 'init', self.fullpath],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+        ).communicate()
+        log_error(
+            LOG_GIT,
+            error,
+            "An error occured during the creation of the virtualenv."
+        )
+        print("{green}Ok{end}".format(green=colors.OKGREEN, end=colors.ENDC))
+
+        print('Generating Gitignore...\t\t\t', end="", flush=True)
+        shutil.copyfile(self.gitignore_template, self.gitignore)
+        print("{green}Ok{end}".format(green=colors.OKGREEN, end=colors.ENDC))
+
+
+def generate(template_file='', template_vars=dict()):
+    template = template_env.get_template(template_file)
+    template_vars.update(global_vars)
+    return template.render(template_vars)
+
+
 def generate_brief(template_var):
-    template = template_env.get_template('brief.jinja2')
-    return template.render(template_var)
+    return generate('brief.jinja2', template_var)
+
+
+def generate_errorlist(template_var):
+    return generate('errors.jinja2', template_var)
 
 
 def generate_crsf_secret_key():
     return
 
 
-def install_git(fullpath=""):
-    print('Git Init...\t\t\t\t', end="", flush=True)
-    output, error = subprocess.Popen(
-        ['git', 'init', fullpath],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE
-    ).communicate()
-    if error:
-        with open('git_error.log', 'w') as fd:
-            fd.write(error.decode('utf-8'))
-        print("{red}An error occured during the creation of the virtualenv. Please consult "
-              "{yellow}virtualenv_error.log{red} file for details.{end}".format(
-                  red=colors.FAIL,
-                  yellow=colors.WARNING,
-                  end=colors.ENDC))
-        sys.exit(2)
-    print("{green}Ok{end}".format(green=colors.OKGREEN, end=colors.ENDC))
-    print('Generating Gitignore...\t\t\t', end="", flush=True)
-    shutil.copyfile(os.path.join(base_dir, 'templates', 'gitignore'), os.path.join(fullpath, '.gitignore'))
-    print("{green}Ok{end}".format(green=colors.OKGREEN, end=colors.ENDC))
-
-
-def install_bower(fullpath="", bower_exe="", bower=[]):
-    os.chdir(os.path.join(fullpath, 'app', 'static'))
-    for dependency in bower:
-        print("Bower {}...\t\t\t".format(dependency.title()), end="", flush=True)
-        output, error = subprocess.Popen(
-            [bower_exe, 'install', dependency],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
-        ).communicate()
-        if error:
-            with open('bower_error.log', 'w') as fd:
-                fd.write(error.decode('utf-8'))
-            print("{red}An error occured during the installation of {dep}. Please consult {yellow}bower_error.log{red} file for details.{end}".format(
-                red=colors.FAIL,
-                yellow=colors.WARNING,
-                end=colors.ENDC,
-                dep=dependency))
-        print("{green}Ok{end}".format(green=colors.OKGREEN, end=colors.ENDC))
-
-
-def install_virtualenv(fullpath="", virtualenv_exe=""):
-    # If virtualenv is requested, then create it and install the required libs to work
-    print('Creating the virtualenv...\t\t', end="", flush=True)
-    output, error = subprocess.Popen(
-        [virtualenv_exe, os.path.join(fullpath, 'venv'), '--no-site-package'],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE
-    ).communicate()
-    if error:
-        with open('virtualenv_error.log', 'w') as fd:
-            fd.write(error.decode('utf-8'))
-            print("{red}An error occured during the creation of the virtualenv. Please consult {yellow}virtualenv_error.log{red} file for details.{end}".format(
-                red=colors.FAIL,
-                yellow=colors.WARNING,
-                end=colors.ENDC))
-            sys.exit(2)
-    venv_bin = os.path.join(fullpath, 'venv/bin')
-    print("{green}Ok{end}".format(green=colors.OKGREEN, end=colors.ENDC))
-    print("Installing Python Dependencies...\t", end="", flush=True)
-    output, error = subprocess.Popen(
-        [os.path.join(venv_bin, 'pip'), 'install', '-r', os.path.join(fullpath, 'requirements.txt')],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE
-    ).communicate()
-    if error:
-        with open('pip_error.log', 'w') as fd:
-            fd.write(error.decode('utf-8'))
-            print("{red}An error occured during the installation of dependencies. Please consult {yellow}pip_error.log{red} file for details.{end}".format(
-                red=colors.FAIL,
-                yellow=colors.WARNING,
-                end=colors.ENDC))
-        sys.exit(2)
-    print("{green}Ok{end}".format(green=colors.OKGREEN, end=colors.ENDC))
-
-
 def main(argv):
-    parser = argparse.ArgumentParser(description='Create a flask skeleton application using some command line options.')
+    parser = argparse.ArgumentParser(description='Create a skeleton application using some command line options.')
     parser.add_argument('appname', help='The application name')
     parser.add_argument('-b', '--bower', help='Dependencies installed using bower')
     parser.add_argument('-n', '--no-debug', action='store_false')
@@ -117,8 +298,13 @@ def main(argv):
     parser.add_argument('-d', '--database', action='store_true')
     parser.add_argument('-g', '--git', action='store_true')
     args = parser.parse_args()
+
+    bower_deps = None
+    if args.bower:
+        bower_deps = args.bower.split(',')
+
     install(
-        bower_deps=args.bower,
+        bower=bower_deps,
         virtualenv=args.virtualenv,
         debug=args.no_debug,
         appname=args.appname,
@@ -127,102 +313,34 @@ def main(argv):
     )
 
 
-def install(bower_deps=None, virtualenv=None, debug=False, appname="", database=None, git=None):
-    errors = []
-    bower = None
-    bower_exe = None
-    if bower_deps:
-        bower = bower_deps.split(',')
-        bower_exe = shutil.which('bower')
-        if not bower_exe:
-            errors.append('Bower executable could not be found.')
+def install(bower=None, virtualenv=False, debug=False, appname="", database=None, git=None):
+    if database:
+        project_template = ProjectTemplate(
+            skeleton_dir='skel_db',
+            config_file='config_db.jinja2',
+        )
+        project_template.database = True
+    else:
+        project_template = ProjectTemplate()
 
-    virtualenv_exe = None
-    if virtualenv:
-        virtualenv_exe = shutil.which('virtualenv')
-        if not virtualenv_exe:
-            errors.append('Virtualenv executable could not be found.')
-            virtualenv = False
+    project_template.appname = appname
+    project_template.debug = debug
 
-    fullpath = os.path.join(cwd, appname)
-    secret_key = codecs.encode(os.urandom(32), 'hex').decode('utf-8')
+    project_template.bower = bower
+    project_template.virtualenv = virtualenv
+    project_template.git = git
 
-    template_var = {
-        'pyversion': platform.python_version(),
-        'appname': appname,
-        'bower': bower,
-        'debug': debug,
-        'virtualenv': virtualenv,
-        'secret_key': secret_key,
-        'path': fullpath,
-        'require': colors.WARNING,
-        'enabled': colors.OKGREEN,
-        'disabled': colors.FAIL,
-        'end': colors.ENDC,
-        'database': database,
-        'git': git
-    }
-
-    if virtualenv:
-        template_var['virtualenv_exe'] = virtualenv_exe
-
-    if bower:
-        template_var['bower_exe'] = bower_exe
-
-    print(generate_brief(template_var))
-    if len(errors) > 0:
-        template = template_env.get_template('errors.jinja2')
-        template_var = {
-            'errors': errors,
-            'red': colors.FAIL,
-            'end': colors.ENDC
-        }
-        print(template.render(template_var))
+    print(generate_brief(project_template.template_var))
+    if project_template.externals.has_errors:
+        errors = project_template.externals.errors
+        print(generate_errorlist({'errors': errors, }))
         sys.exit(1)
 
     if query_yes_no("Is this correct ?"):
-        if database:
-            skeleton_dir = 'skel_db'
-            config_file = 'config_db.jinja2'
-        else:
-            skeleton_dir = 'skel'
-            config_file = 'config.jinja2'
-
-        install_template(
-            skeleton_dir=skeleton_dir,
-            config_file=config_file,
-            fullpath=fullpath,
-            secret_key=secret_key,
-            debug=debug,
-        )
-
-        if virtualenv:
-            install_virtualenv(fullpath=fullpath, virtualenv_exe=virtualenv_exe)
-        if bower:
-            install_bower(fullpath-fullpath, bower_exe=bower_exe, bower=bower)
-        if git:
-            install_git(fullpath=fullpath)
+        project_template.install()
     else:
         print("Aborting")
         sys.exit(0)
-
-
-def install_template(skeleton_dir="", config_file="", fullpath="", secret_key="", debug=False):
-    # Copying the whole skeleton into the new path. Error if the path already exists
-    # TODO error handling here.
-    print('Copying Skeleton...\t\t\t', end="", flush=True)
-    shutil.copytree(os.path.join(script_dir, skeleton_dir), fullpath)
-    print("{green}Ok{end}".format(green=colors.OKGREEN, end=colors.ENDC))
-    # Creating the configuration file using the command line arguments
-    print('Creating config file...\t\t\t', end="", flush=True)
-    template = template_env.get_template(config_file)
-    template_var = {
-        'secret_key': secret_key,
-        'debug': debug,
-    }
-    with open(os.path.join(fullpath, 'config.py'), 'w') as fd:
-        fd.write(template.render(template_var))
-    print("{green}Ok{end}".format(green=colors.OKGREEN, end=colors.ENDC))
 
 
 if __name__ == '__main__':
