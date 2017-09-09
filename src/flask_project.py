@@ -10,22 +10,16 @@ import codecs
 import platform
 import subprocess
 
+import config
+
 from utils import colors, query_yes_no
-
-
-LOG_VIRTUALENV = "virtualenv-error.log"
-LOG_PIP = "pip-error.log"
-LOG_BOWER = "bower-error.log"
-LOG_GIT = "git-error.log"
 
 
 # Environment variables
 cwd = os.getcwd()
-base_dir = os.path.abspath(os.path.join(os.path.dirname(os.path.realpath(__file__)), ".."))
-script_dir = os.path.join(base_dir, "projects")
 
 # Jinja2 Environment
-template_loader = jinja2.FileSystemLoader(searchpath=os.path.join(base_dir, "templates"))
+template_loader = jinja2.FileSystemLoader(searchpath=config.TEMPLATE_DIR)
 template_env = jinja2.Environment(loader=template_loader)
 
 
@@ -107,7 +101,7 @@ class ProjectTemplate():
 
     @property
     def source_dir(self):
-        return os.path.join(script_dir, self.skeleton_dir)
+        return os.path.join(config.SCRIPT_DIR, self.skeleton_dir)
 
     @property
     def static_dir(self):
@@ -172,7 +166,7 @@ class ProjectTemplate():
 
     @property
     def gitignore_template(self):
-        return os.path.join(base_dir, 'templates', 'gitignore')
+        return os.path.join(config.BASE_DIR, 'templates', 'gitignore')
 
     @property
     def gitignore(self):
@@ -212,7 +206,7 @@ class ProjectTemplate():
             stderr=subprocess.PIPE
         ).communicate()
         log_error(
-            LOG_VIRTUALENV,
+            config.LOG_VIRTUALENV,
             error,
             "An error occured during the creation of the virtualenv."
         )
@@ -227,7 +221,7 @@ class ProjectTemplate():
             stderr=subprocess.PIPE
         ).communicate()
         log_error(
-            LOG_PIP,
+            config.LOG_PIP,
             error,
             "An error occured during the installation of dependencies.",
         )
@@ -243,7 +237,7 @@ class ProjectTemplate():
                 stderr=subprocess.PIPE
             ).communicate()
             log_error(
-                LOG_BOWER,
+                config.LOG_BOWER,
                 error,
                 "An error occured during the installation of {dep}.".format(
                     dep=dependency
@@ -260,7 +254,7 @@ class ProjectTemplate():
             stderr=subprocess.PIPE
         ).communicate()
         log_error(
-            LOG_GIT,
+            config.LOG_GIT,
             error,
             "An error occured during the creation of the virtualenv."
         )
