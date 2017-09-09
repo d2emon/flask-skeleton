@@ -1,3 +1,4 @@
+#! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
 import os
@@ -13,10 +14,11 @@ from utils import colors, query_yes_no
 
 # Environment variables
 cwd = os.getcwd()
-script_dir = os.path.dirname(os.path.realpath(__file__))
+base_dir = os.path.dirname(os.path.realpath(__file__))
+script_dir = os.path.join(base_dir, "projects")
 
 # Jinja2 Environment
-template_loader = jinja2.FileSystemLoader(searchpath=os.path.join(script_dir, "templates"))
+template_loader = jinja2.FileSystemLoader(searchpath=os.path.join(base_dir, "templates"))
 template_env = jinja2.Environment(loader=template_loader)
 
 
@@ -26,7 +28,7 @@ def generate_brief(template_var):
 
 
 def generate_crsf_secret_key():
-    return 
+    return
 
 
 def main(argv):
@@ -188,7 +190,7 @@ def main(argv):
                     sys.exit(2)
             print("{green}Ok{end}".format(green=colors.OKGREEN, end=colors.ENDC))
             print('Generating Gitignore...\t\t\t', end="", flush=True)
-            shutil.copyfile(os.path.join(script_dir, 'templates', 'gitignore'), os.path.join(fullpath, '.gitignore'))
+            shutil.copyfile(os.path.join(base_dir, 'templates', 'gitignore'), os.path.join(fullpath, '.gitignore'))
             print("{green}Ok{end}".format(green=colors.OKGREEN, end=colors.ENDC))
 
     else:
