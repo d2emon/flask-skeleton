@@ -84,124 +84,52 @@ class Externals():
 
 class ProjectTemplate():
     def __init__(self, skeleton_dir="skel", config_file="config.jinja2"):
-        self.appname = "app"
-        self.errors = []
         self.skeleton_dir = skeleton_dir
         self.config_file = config_file
-        self.secret_key = codecs.encode(os.urandom(32), 'hex').decode('utf-8')
-        self.debug = True
 
         self.externals = Externals()
-
-        self.database = False
-
-        self.bower = []
-        self.virtualenv = False
-        self.git = False
 
     @property
     def source_dir(self):
         return os.path.join(config.SCRIPT_DIR, self.skeleton_dir)
 
-    @property
-    def static_dir(self):
-        return os.path.join(self.fullpath, 'app', 'static')
-
-    @property
-    def template_var(self):
-        template_var = {
-            'appname': self.appname,
-            'bower': self.bower,
-            'debug': self.debug,
-            'virtualenv': self.virtualenv,
-            'secret_key': self.secret_key,
-            'path': self.fullpath,
-            'database': self.database,
-            'git': self.git,
-        }
-        # bower = None
-        if self.bower:
-            template_var['bower_exe'] = self.externals.bower
-        if self.virtualenv:
-            template_var['virtualenv_exe'] = self.externals.virtualenv
-        return template_var
-
-    @property
-    def config_var(self):
-        return {
-            'secret_key': self.secret_key,
-            'debug': self.debug,
-        }
-
-    @property
-    def template(self):
-        return template_env.get_template(self.config_file)
-
-    def generate_config(self):
-        return generate(self.config_file, self.config_var)
-
-    @property
-    def fullpath(self):
-        return os.path.join(cwd, self.appname)
-
-    @property
-    def venv_dir(self):
-        return os.path.join(self.fullpath, 'venv')
-
-    @property
-    def venv_bin(self):
-        return os.path.join(self.fullpath, 'venv', 'bin')
-
-    @property
-    def pip_bin(self):
-        return os.path.join(self.venv_bin, 'pip')
-
-    @property
-    def requirements(self):
-        return os.path.join(self.fullpath, 'requirements.txt')
-
-    @property
-    def config(self):
-        return os.path.join(self.fullpath, 'config.py')
-
-    @property
-    def gitignore_template(self):
-        return os.path.join(config.BASE_DIR, 'templates', 'gitignore')
+    def generate_config(self, config):
+        return generate(self.config_file, config)
 
     @property
     def gitignore(self):
-        return os.path.join(self.fullpath, '.gitignore')
+        return os.path.join(config.BASE_DIR, 'templates', 'gitignore')
 
-    def install(self):
-        self.copy_skeleton()
-        self.create_config()
+    def install(self, project):
+        self.copy_skeleton(project)
+        self.create_config(project)
 
-        if self.virtualenv:
-            self.install_virtualenv()
-        if self.bower:
-            self.install_bower(bower=self.bower)
-        if self.git:
-            self.install_git()
+        if project.virtualenv:
+            self.install_virtualenv(project)
+        if project.bower:
+            self.install_bower(project, bower=project.bower)
+        if project.git:
+            self.install_git(project)
 
-    def copy_skeleton(self):
+    def copy_skeleton(self, project):
         # Copying the whole skeleton into the new path. Error if the path already exists
         # TODO error handling here.
         print('Copying Skeleton...\t\t\t', end="", flush=True)
-        shutil.copytree(self.source_dir, self.fullpath)
+        shutil.copytree(self.source_dir, project.app_path)
         print("{green}Ok{end}".format(green=colors.OKGREEN, end=colors.ENDC))
 
-    def create_config(self):
+    def create_config(self, project):
         # Creating the configuration file using the command line arguments
         print('Creating config file...\t\t\t', end="", flush=True)
-        with open(self.config, 'w') as fd:
-            fd.write(self.generate_config())
+        with open(project.config_file, 'w') as fd:
+            fd.write(self.generate_config(project.config))
         print("{green}Ok{end}".format(green=colors.OKGREEN, end=colors.ENDC))
 
-    def install_virtualenv(self):
+    def install_virtualenv(self, project):
         # If virtualenv is requested, then create it and install the required libs to work
         print('Creating the virtualenv...\t\t', end="", flush=True)
         output, error = subprocess.Popen(
-            [self.externals.virtualenv, self.venv_dir, '--no-site-package'],
+            [self.externals.virtualenv, project.venv_dir, '--no-site-package'],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE
         ).communicate()
@@ -211,12 +139,12 @@ class ProjectTemplate():
             "An error occured during the creation of the virtualenv."
         )
         print("{green}Ok{end}".format(green=colors.OKGREEN, end=colors.ENDC))
-        self.install_dependencies()
+        self.install_dependencies(project)
 
-    def install_dependencies(self):
+    def install_dependencies(self, project):
         print("Installing Python Dependencies...\t", end="", flush=True)
         output, error = subprocess.Popen(
-            [self.pip_bin, 'install', '-r', self.requirements],
+            [project.pip_file, 'install', '-r', project.requirements_file],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE
         ).communicate()
@@ -227,8 +155,8 @@ class ProjectTemplate():
         )
         print("{green}Ok{end}".format(green=colors.OKGREEN, end=colors.ENDC))
 
-    def install_bower(self, bower=[]):
-        os.chdir(self.static_dir)
+    def install_bower(self, project, bower=[]):
+        os.chdir(project.static_dir)
         for dependency in bower:
             print("Bower {}...\t\t\t".format(dependency.title()), end="", flush=True)
             output, error = subprocess.Popen(
@@ -246,10 +174,10 @@ class ProjectTemplate():
             )
             print("{green}Ok{end}".format(green=colors.OKGREEN, end=colors.ENDC))
 
-    def install_git(self):
+    def install_git(self, project):
         print('Git Init...\t\t\t\t', end="", flush=True)
         output, error = subprocess.Popen(
-            [self.externals.git, 'init', self.fullpath],
+            [self.externals.git, 'init', project.app_path],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE
         ).communicate()
@@ -261,8 +189,88 @@ class ProjectTemplate():
         print("{green}Ok{end}".format(green=colors.OKGREEN, end=colors.ENDC))
 
         print('Generating Gitignore...\t\t\t', end="", flush=True)
-        shutil.copyfile(self.gitignore_template, self.gitignore)
+        shutil.copyfile(self.gitignore, project.gitignore_file)
         print("{green}Ok{end}".format(green=colors.OKGREEN, end=colors.ENDC))
+
+
+class Project():
+    def __init__(self, appname="app", template=None):
+        self.appname = appname
+        if template is None:
+            template = ProjectTemplate()
+        self.template = template
+
+        self.secret_key = codecs.encode(os.urandom(32), 'hex').decode('utf-8')
+        self.debug = True
+
+        self.virtualenv = False
+        self.bower = []
+        self.git = False
+
+    @property
+    def app_path(self):
+        return os.path.join(cwd, self.appname)
+
+    @property
+    def venv_dir(self):
+        return os.path.join(self.app_path, 'venv')
+
+    @property
+    def venv_bin_dir(self):
+        return os.path.join(self.app_path, 'venv', 'bin')
+
+    @property
+    def static_dir(self):
+        return os.path.join(self.app_path, 'app', 'static')
+
+    @property
+    def pip_file(self):
+        return os.path.join(self.venv_bin_dir, 'pip')
+
+    @property
+    def config_file(self):
+        return os.path.join(self.app_path, 'config.py')
+
+    @property
+    def requirements_file(self):
+        return os.path.join(self.app_path, 'requirements.txt')
+
+    @property
+    def gitignore_file(self):
+        return os.path.join(self.app_path, '.gitignore')
+
+    @property
+    def config_template(self):
+        return template_env.get_template(self.template.config_file)
+
+    @property
+    def config(self):
+        return {
+            'secret_key': self.secret_key,
+            'debug': self.debug,
+        }
+
+    @property
+    def brief_var(self):
+        brief_var = {
+            'appname': self.appname,
+            'bower': self.bower,
+            'debug': self.debug,
+            'virtualenv': self.virtualenv,
+            'secret_key': self.secret_key,
+            'path': self.app_path,
+            'database': self.template.database,
+            'git': self.git,
+        }
+        # bower = None
+        if self.bower:
+            brief_var['bower_exe'] = self.template.externals.bower
+        if self.virtualenv:
+            brief_var['virtualenv_exe'] = self.template.externals.virtualenv
+        return brief_var
+
+    def install(self):
+        self.template.install(self)
 
 
 def generate(template_file='', template_vars=dict()):
@@ -316,22 +324,22 @@ def install(bower=None, virtualenv=False, debug=False, appname="", database=None
         project_template.database = True
     else:
         project_template = ProjectTemplate()
+    project = Project(appname, project_template)
 
-    project_template.appname = appname
-    project_template.debug = debug
+    project.debug = debug
 
-    project_template.bower = bower
-    project_template.virtualenv = virtualenv
-    project_template.git = git
+    project.bower = bower
+    project.virtualenv = virtualenv
+    project.git = git
 
-    print(generate_brief(project_template.template_var))
+    print(generate_brief(project.brief_var))
     if project_template.externals.has_errors:
         errors = project_template.externals.errors
         print(generate_errorlist({'errors': errors, }))
         sys.exit(1)
 
     if query_yes_no("Is this correct ?"):
-        project_template.install()
+        project.install()
     else:
         print("Aborting")
         sys.exit(0)
