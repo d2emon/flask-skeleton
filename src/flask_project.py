@@ -14,7 +14,7 @@ from utils import colors, query_yes_no
 
 # Environment variables
 cwd = os.getcwd()
-base_dir = os.path.dirname(os.path.realpath(__file__))
+base_dir = os.path.abspath(os.path.join(os.path.dirname(os.path.realpath(__file__)), ".."))
 script_dir = os.path.join(base_dir, "projects")
 
 # Jinja2 Environment
