@@ -41,6 +41,16 @@ def log_error(logfile='error.log', error="", msg="", exit_on_error=True):
             sys.exit(2)
 
 
+def next_step(msg="Next step"):
+    def next_step_decorator(f):
+        def decorated(*args, **kwargs):
+            print("{msg}\t".format(msg=msg), end="", flush=True)
+            f(*args, **kwargs)
+            print("{green}Ok{end}".format(green=colors.OKGREEN, end=colors.ENDC))
+        return decorated
+    return next_step_decorator
+
+
 def generate(template_file='', template_vars=dict()):
     template = template_env.get_template(template_file)
     template_vars.update(global_vars)
@@ -87,65 +97,55 @@ class Externals():
     def has_errors(self):
         return len(self.errors) > 0
 
+    def run(self, params, logfile, msg, exit_on_error=True):
+        output, error = subprocess.Popen(
+            params,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+        ).communicate()
+        log_error(
+            logfile,
+            error,
+            msg,
+            exit_on_error
+        )
+
+    @next_step("Creating the virtualenv...\t")
     def install_virtualenv(self, venv_dir):
         # If virtualenv is requested, then create it and install the required libs to work
-        print('Creating the virtualenv...\t\t', end="", flush=True)
-        output, error = subprocess.Popen(
+        self.run(
             [self.virtualenv, venv_dir, '--no-site-package'],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
-        ).communicate()
-        log_error(
             config.LOG_VIRTUALENV,
-            error,
             "An error occured during the creation of the virtualenv."
         )
-        print("{green}Ok{end}".format(green=colors.OKGREEN, end=colors.ENDC))
 
+    @next_step("Installing Python Dependencies...")
     def install_dependencies(self, pip_file, requirements_file):
-        print("Installing Python Dependencies...\t", end="", flush=True)
-        output, error = subprocess.Popen(
+        self.run(
             [pip_file, 'install', '-r', requirements_file],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
-        ).communicate()
-        log_error(
             config.LOG_PIP,
-            error,
             "An error occured during the installation of dependencies.",
         )
-        print("{green}Ok{end}".format(green=colors.OKGREEN, end=colors.ENDC))
 
+    @next_step("Bower")
     def install_bower(self, dependency):
-        print("Bower {}...\t\t\t".format(dependency.title()), end="", flush=True)
-        output, error = subprocess.Popen(
+        print("{}...\t\t\t".format(dependency.title()), end="", flush=True)
+        self.run(
             [self.bower, 'install', dependency],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
-        ).communicate()
-        log_error(
             config.LOG_BOWER,
-            error,
             "An error occured during the installation of {dep}.".format(
                 dep=dependency
             ),
             False
         )
-        print("{green}Ok{end}".format(green=colors.OKGREEN, end=colors.ENDC))
 
+    @next_step("Git Init...\t\t\t")
     def install_git(self, app_path):
-        print('Git Init...\t\t\t\t', end="", flush=True)
-        output, error = subprocess.Popen(
+        self.run(
             [self.git, 'init', app_path],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
-        ).communicate()
-        log_error(
             config.LOG_GIT,
-            error,
             "An error occured during the creation of the virtualenv."
         )
-        print("{green}Ok{end}".format(green=colors.OKGREEN, end=colors.ENDC))
 
 
 class ProjectTemplate():
@@ -177,24 +177,21 @@ class ProjectTemplate():
             self.externals.install_git(project.app_path)
             self.install_gitignore(project)
 
+    @next_step("Copying Skeleton...\t\t")
     def copy_skeleton(self, project):
         # Copying the whole skeleton into the new path. Error if the path already exists
         # TODO error handling here.
-        print('Copying Skeleton...\t\t\t', end="", flush=True)
         shutil.copytree(self.source_dir, project.app_path)
-        print("{green}Ok{end}".format(green=colors.OKGREEN, end=colors.ENDC))
 
+    @next_step("Creating config file...\t\t")
     def create_config(self, project):
         # Creating the configuration file using the command line arguments
-        print('Creating config file...\t\t\t', end="", flush=True)
         with open(self.project_config_file(project), 'w') as fd:
             fd.write(self.generate_config(project.config))
-        print("{green}Ok{end}".format(green=colors.OKGREEN, end=colors.ENDC))
 
+    @next_step("Generating Gitignore...\t\t")
     def install_gitignore(self, project):
-        print('Generating Gitignore...\t\t\t', end="", flush=True)
         shutil.copyfile(self.gitignore, self.gitignore_file(project))
-        print("{green}Ok{end}".format(green=colors.OKGREEN, end=colors.ENDC))
 
 
 class PythonProjectTemplate(ProjectTemplate):
