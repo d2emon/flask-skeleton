@@ -166,24 +166,6 @@ class ProjectTemplate():
     def gitignore(self):
         return os.path.join(config.BASE_DIR, 'templates', 'gitignore')
 
-    def venv_dir(self, project):
-        return os.path.join(project.app_path, 'venv')
-
-    def venv_bin_dir(self, project):
-        return os.path.join(project.app_path, 'venv', 'bin')
-
-    def static_dir(self, project):
-        return os.path.join(project.app_path, 'app', 'static')
-
-    def pip_file(self, project):
-        return os.path.join(self.venv_bin_dir(project), 'pip')
-
-    def project_config_file(self, project):
-        return os.path.join(project.app_path, 'config.py')
-
-    def requirements_file(self, project):
-        return os.path.join(project.app_path, 'requirements.txt')
-
     def gitignore_file(self, project):
         return os.path.join(project.app_path, '.gitignore')
 
@@ -191,13 +173,6 @@ class ProjectTemplate():
         self.copy_skeleton(project)
         self.create_config(project)
 
-        if project.virtualenv:
-            self.externals.install_virtualenv(self.venv_dir(project))
-            self.externals.install_dependencies(self.pip_file(project), self.requirements_file(project))
-        if project.bower:
-            os.chdir(self.static_dir(project))
-            for dependency in project.bower:
-                self.externals.install_bower(dependency)
         if project.git:
             self.externals.install_git(project.app_path)
             self.install_gitignore(project)
@@ -220,3 +195,35 @@ class ProjectTemplate():
         print('Generating Gitignore...\t\t\t', end="", flush=True)
         shutil.copyfile(self.gitignore, self.gitignore_file(project))
         print("{green}Ok{end}".format(green=colors.OKGREEN, end=colors.ENDC))
+
+
+class PythonProjectTemplate(ProjectTemplate):
+    def venv_dir(self, project):
+        return os.path.join(project.app_path, 'venv')
+
+    def venv_bin_dir(self, project):
+        return os.path.join(project.app_path, 'venv', 'bin')
+
+    def pip_file(self, project):
+        return os.path.join(self.venv_bin_dir(project), 'pip')
+
+    def requirements_file(self, project):
+        return os.path.join(project.app_path, 'requirements.txt')
+
+    def install(self, project):
+        ProjectTemplate.install(self, project)
+        if project.virtualenv:
+            self.externals.install_virtualenv(self.venv_dir(project))
+            self.externals.install_dependencies(self.pip_file(project), self.requirements_file(project))
+        if project.bower:
+            os.chdir(self.static_dir(project))
+            for dependency in project.bower:
+                self.externals.install_bower(dependency)
+
+
+class FlaskProjectTemplate(PythonProjectTemplate):
+    def static_dir(self, project):
+        return os.path.join(project.app_path, 'app', 'static')
+
+    def project_config_file(self, project):
+        return os.path.join(project.app_path, 'config.py')

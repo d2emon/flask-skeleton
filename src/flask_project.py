@@ -7,18 +7,18 @@ import argparse
 import codecs
 
 from utils import query_yes_no
-from template import ProjectTemplate, template_env, generate_brief, generate_errorlist
+from template import FlaskProjectTemplate, template_env, generate_brief, generate_errorlist
 
 
 # Environment variables
 cwd = os.getcwd()
 
 
-class Project():
+class FlaskProject():
     def __init__(self, appname="app", template=None):
         self.appname = appname
         if template is None:
-            template = ProjectTemplate()
+            template = FlaskProjectTemplate()
         self.template = template
 
         self.secret_key = codecs.encode(os.urandom(32), 'hex').decode('utf-8')
@@ -90,14 +90,14 @@ def main(argv):
     git = args.git
 
     if database:
-        project_template = ProjectTemplate(
+        project_template = FlaskProjectTemplate(
             skeleton_dir='skel_db',
             config_file='config_db.jinja2',
         )
         project_template.database = True
     else:
-        project_template = ProjectTemplate()
-    project = Project(appname, project_template)
+        project_template = FlaskProjectTemplate()
+    project = FlaskProject(appname, project_template)
 
     project.debug = debug
 
