@@ -224,3 +224,9 @@ class FlaskProjectTemplate(PythonProjectTemplate):
 
     def project_config_file(self, project):
         return os.path.join(project.app_path, 'config.py')
+
+
+class FlaskDbProjectTemplate(FlaskProjectTemplate):
+    def __init__(self, skeleton_dir="skel_db", config_file="config_db.jinja2"):
+        FlaskProjectTemplate.__init__(self, skeleton_dir, config_file)
+        self.database = True
