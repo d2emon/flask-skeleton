@@ -1,12 +1,13 @@
 import os
 import shutil
+import jinja2
 
 
 import config
 
 
 from external import Git
-from template import next_step, generate
+from template import next_step, global_vars
 
 
 # Environment variables
@@ -16,6 +17,7 @@ cwd = os.getcwd()
 class Project():
     source_dir = "skel"
     config_file = "config.jinja2"
+    template_dir = config.SCRIPT_DIR
     database = False
 
     def __init__(self, appname="app", **kwargs):
@@ -41,12 +43,21 @@ class Project():
         return os.path.join(config.SCRIPT_DIR, self.source_dir)
 
     @classmethod
+    def get_template(cls, filename):
+        template_loader = jinja2.FileSystemLoader(searchpath=cls.template_dir)
+        template_env = jinja2.Environment(loader=template_loader)
+        return template_env.get_template(filename)
+
+    @classmethod
     def generate_config(cls, config):
-        return generate(cls.config_file, config)
+        template = cls.get_template(cls.config_file)
+        template_vars = config
+        template_vars.update(global_vars)
+        return template.render(template_vars)
 
     @property
     def gitignore_template(self):
-        return os.path.join(config.BASE_DIR, 'templates', 'gitignore')
+        return os.path.join(config.SCRIPT_DIR, 'gitignore')
 
     @property
     def gitignore_file(self):
