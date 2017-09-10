@@ -19,9 +19,10 @@ class Project():
     config_file = "config.jinja2"
     database = False
 
-    def __init__(self, appname="app"):
+    def __init__(self, appname="app", **kwargs):
         self.appname = appname
-        self.git = False
+
+        self.git = kwargs.get('git', False)
 
     @property
     def app_path(self):
@@ -57,8 +58,7 @@ class Project():
         self.create_config()
 
         if self.git:
-            Git.install(self.app_path)
-            self.install_gitignore()
+            Git.install(self.app_path, self.gitignore_template, self.gitignore_file)
 
     @next_step("Copying Skeleton...\t\t")
     def copy_skeleton(self):
@@ -72,15 +72,11 @@ class Project():
         with open(self.project_config_file, 'w') as fd:
             fd.write(self.generate_config(self.config))
 
-    @next_step("Generating Gitignore...\t\t")
-    def install_gitignore(self):
-        shutil.copyfile(self.gitignore_template, self.gitignore_file)
-
 
 class PythonProject(Project):
-    def __init__(self, appname="app"):
-        Project.__init__(self, appname)
-        self.virtualenv = False
+    def __init__(self, appname="app", **kwargs):
+        Project.__init__(self, appname, **kwargs)
+        self.virtualenv = kwargs.get('virtualenv', False)
 
     @property
     def brief_var(self):
@@ -99,31 +95,22 @@ class PythonProject(Project):
         return os.path.join(self.app_path, 'venv')
 
     @property
-    def venv_bin_dir(self):
-        return os.path.join(self.app_path, 'venv', 'bin')
-
-    @property
-    def pip_file(self):
-        return os.path.join(self.venv_bin_dir, 'pip')
-
-    @property
     def requirements_file(self):
         return os.path.join(self.app_path, 'requirements.txt')
 
     def install(self):
         Project.install(self)
         if self.virtualenv:
-            Virtualenv.install(self.venv_dir)
-            Virtualenv.install_dependencies(self.pip_file, self.requirements_file)
+            Virtualenv.install(self.venv_dir, self.requirements_file)
 
 
 class FlaskProject(PythonProject):
-    def __init__(self, appname="app"):
-        PythonProject.__init__(self, appname)
+    def __init__(self, appname="app", **kwargs):
+        PythonProject.__init__(self, appname, **kwargs)
 
         self.secret_key = codecs.encode(os.urandom(32), 'hex').decode('utf-8')
-        self.debug = True
-        self.bower = []
+        self.debug = kwargs.get('debug', True)
+        self.bower = kwargs.get('bower', [])
 
     @property
     def config_template(self):
@@ -166,9 +153,7 @@ class FlaskProject(PythonProject):
     def install(self):
         PythonProject.install(self)
         if self.bower:
-            os.chdir(self.static_dir)
-            for dependency in self.bower:
-                Bower.install(dependency)
+            Bower.install(self.static_dir, self.bower)
 
 
 class FlaskDbProject(FlaskProject):

@@ -1,3 +1,4 @@
+import os
 import sys
 import shutil
 import subprocess
@@ -60,8 +61,14 @@ class Bower(External):
     error_msg = 'Bower executable could not be found.'
 
     @classmethod
+    def install(cls, static_dir, dependencies):
+        os.chdir(static_dir)
+        for dependency in dependencies:
+            cls.install_dependency(dependency)
+
+    @classmethod
     @next_step("Bower")
-    def install(cls, dependency):
+    def install_dependency(cls, dependency):
         print("{}...\t\t\t".format(dependency.title()), end="", flush=True)
         run(
             [cls.cmd(), 'install', dependency],
@@ -78,20 +85,33 @@ class Virtualenv(External):
     error_msg = 'Virtualenv executable could not be found.'
 
     @classmethod
+    def venv_bin_dir(cls, venv_path):
+        return os.path.join(venv_path, 'bin')
+
+    @classmethod
+    def pip_bin(cls, venv_path):
+        return os.path.join(cls.venv_bin_dir(venv_path), 'pip')
+
+    @classmethod
+    def install(cls, venv_path, requirements_file):
+        cls.install_venv(venv_path)
+        cls.install_dependencies(venv_path, requirements_file)
+
+    @classmethod
     @next_step("Creating the virtualenv...\t")
-    def install(cls, venv_dir):
+    def install_venv(cls, venv_path):
         # If virtualenv is requested, then create it and install the required libs to work
         run(
-            [cls.cmd(), venv_dir, '--no-site-package'],
+            [cls.cmd(), venv_path, '--no-site-package'],
             config.LOG_VIRTUALENV,
             "An error occured during the creation of the virtualenv."
         )
 
     @classmethod
     @next_step("Installing Python Dependencies...")
-    def install_dependencies(cls, pip_file, requirements_file):
+    def install_dependencies(cls, venv_path, requirements_file):
         run(
-            [pip_file, 'install', '-r', requirements_file],
+            [cls.pip_bin(venv_path), 'install', '-r', requirements_file],
             config.LOG_PIP,
             "An error occured during the installation of dependencies.",
         )
@@ -102,10 +122,20 @@ class Git(External):
     cmd_name = "git"
 
     @classmethod
+    def install(cls, app_path, gitignore_template, gitignore_file):
+        cls.install_git(app_path)
+        cls.install_gitignore(gitignore_template, gitignore_file)
+
+    @classmethod
     @next_step("Git Init...\t\t\t")
-    def install(cls, app_path):
+    def install_git(cls, app_path):
         run(
             [cls.cmd(), 'init', app_path],
             config.LOG_GIT,
             "An error occured during the creation of the virtualenv."
         )
+
+    @classmethod
+    @next_step("Generating Gitignore...\t\t")
+    def install_gitignore(cls, gitignore_template, gitignore_file):
+        shutil.copyfile(gitignore_template, gitignore_file)
