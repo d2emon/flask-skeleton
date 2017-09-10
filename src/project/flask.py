@@ -7,6 +7,8 @@ from .python import PythonProject
 
 
 class FlaskProject(PythonProject):
+    template_name = "flask"
+
     def __init__(self, appname="app", **kwargs):
         PythonProject.__init__(self, appname, **kwargs)
 
@@ -46,7 +48,7 @@ class FlaskProject(PythonProject):
 
     @property
     def static_dir(self):
-        return os.path.join(self.app_path, 'app', 'static')
+        return self.app_path
 
     @property
     def project_config_file(self):

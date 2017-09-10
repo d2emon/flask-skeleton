@@ -44,7 +44,7 @@ class Project():
 
     @property
     def source_path(self):
-        return os.path.join(self.tpl_path, 'src')
+        return os.path.join(self.tpl_path(), 'src')
 
     @classmethod
     def get_template(cls, filename):
