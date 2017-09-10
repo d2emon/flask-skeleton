@@ -6,7 +6,7 @@ import argparse
 
 from utils import query_yes_no
 from external import External
-from project import FlaskProject, FlaskDbProject
+from project.flask import FlaskProject, FlaskDbProject
 from template import generate_brief, generate_errorlist
 
 
