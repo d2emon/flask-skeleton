@@ -5,6 +5,7 @@ import sys
 import argparse
 
 from utils import query_yes_no
+from external import External
 from template import FlaskProjectTemplate, FlaskDbProjectTemplate, generate_brief, generate_errorlist
 from project import FlaskProject
 
@@ -45,8 +46,8 @@ def main(argv):
     project.git = git
 
     print(generate_brief(project.brief_var))
-    if project_template.externals.has_errors:
-        errors = project_template.externals.errors
+    errors = External().errors
+    if len(errors) > 0:
         print(generate_errorlist({'errors': errors, }))
         sys.exit(1)
 

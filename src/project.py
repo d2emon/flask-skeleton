@@ -1,7 +1,7 @@
 import os
 import codecs
 
-from template import ProjectTemplate, FlaskProjectTemplate, template_env
+from template import Virtualenv, Bower, ProjectTemplate, FlaskProjectTemplate, template_env
 
 
 # Environment variables
@@ -48,7 +48,7 @@ class PythonProject(Project):
             'git': self.git,
         }
         if self.virtualenv:
-            brief_var['virtualenv_exe'] = self.template.externals.virtualenv
+            brief_var['virtualenv_exe'] = Virtualenv.cmd()
         return brief_var
 
 
@@ -87,7 +87,7 @@ class FlaskProject(PythonProject):
         }
         # bower = None
         if self.bower:
-            brief_var['bower_exe'] = self.template.externals.bower
+            brief_var['bower_exe'] = Bower.cmd()
         if self.virtualenv:
-            brief_var['virtualenv_exe'] = self.template.externals.virtualenv
+            brief_var['virtualenv_exe'] = Virtualenv.cmd()
         return brief_var
