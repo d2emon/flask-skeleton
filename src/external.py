@@ -3,7 +3,11 @@ import shutil
 import subprocess
 
 
+import config
+
+
 from utils import colors
+from template import next_step
 
 
 def log_error(logfile='error.log', error="", msg="", exit_on_error=True):
@@ -55,12 +59,53 @@ class Bower(External):
     cmd_name = "bower"
     error_msg = 'Bower executable could not be found.'
 
+    @classmethod
+    @next_step("Bower")
+    def install(cls, dependency):
+        print("{}...\t\t\t".format(dependency.title()), end="", flush=True)
+        run(
+            [cls.cmd(), 'install', dependency],
+            config.LOG_BOWER,
+            "An error occured during the installation of {dep}.".format(
+                dep=dependency
+            ),
+            False
+        )
+
 
 class Virtualenv(External):
     cmd_name = "virtualenv"
     error_msg = 'Virtualenv executable could not be found.'
 
+    @classmethod
+    @next_step("Creating the virtualenv...\t")
+    def install(cls, venv_dir):
+        # If virtualenv is requested, then create it and install the required libs to work
+        run(
+            [cls.cmd(), venv_dir, '--no-site-package'],
+            config.LOG_VIRTUALENV,
+            "An error occured during the creation of the virtualenv."
+        )
+
+    @classmethod
+    @next_step("Installing Python Dependencies...")
+    def install_dependencies(cls, pip_file, requirements_file):
+        run(
+            [pip_file, 'install', '-r', requirements_file],
+            config.LOG_PIP,
+            "An error occured during the installation of dependencies.",
+        )
+
 
 class Git(External):
     _util = "git"
     cmd_name = "git"
+
+    @classmethod
+    @next_step("Git Init...\t\t\t")
+    def install(cls, app_path):
+        run(
+            [cls.cmd(), 'init', app_path],
+            config.LOG_GIT,
+            "An error occured during the creation of the virtualenv."
+        )

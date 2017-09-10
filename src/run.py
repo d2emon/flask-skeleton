@@ -6,8 +6,8 @@ import argparse
 
 from utils import query_yes_no
 from external import External
-from template import FlaskProjectTemplate, FlaskDbProjectTemplate, generate_brief, generate_errorlist
-from project import FlaskProject
+from project import FlaskProject, FlaskDbProject
+from template import generate_brief, generate_errorlist
 
 
 def generate_crsf_secret_key():
@@ -34,10 +34,9 @@ def main(argv):
     git = args.git
 
     if database:
-        project_template = FlaskDbProjectTemplate()
+        project = FlaskDbProject(appname)
     else:
-        project_template = FlaskProjectTemplate()
-    project = FlaskProject(appname, project_template)
+        project = FlaskProject(appname)
 
     project.debug = debug
 

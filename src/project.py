@@ -1,7 +1,13 @@
 import os
+import shutil
 import codecs
 
-from template import Virtualenv, Bower, ProjectTemplate, FlaskProjectTemplate, template_env
+
+import config
+
+
+from external import Virtualenv, Bower, Git
+from template import template_env, next_step, generate
 
 
 # Environment variables
@@ -9,12 +15,12 @@ cwd = os.getcwd()
 
 
 class Project():
-    def __init__(self, appname="app", template=None):
-        self.appname = appname
-        if template is None:
-            template = ProjectTemplate()
-        self.template = template
+    source_dir = "skel"
+    config_file = "config.jinja2"
+    database = False
 
+    def __init__(self, appname="app"):
+        self.appname = appname
         self.git = False
 
     @property
@@ -30,13 +36,50 @@ class Project():
         }
         return brief_var
 
+    @property
+    def source_path(self):
+        return os.path.join(config.SCRIPT_DIR, self.source_dir)
+
+    @classmethod
+    def generate_config(cls, config):
+        return generate(cls.config_file, config)
+
+    @property
+    def gitignore_template(self):
+        return os.path.join(config.BASE_DIR, 'templates', 'gitignore')
+
+    @property
+    def gitignore_file(self):
+        return os.path.join(self.app_path, '.gitignore')
+
     def install(self):
-        self.template.install(self)
+        self.copy_skeleton()
+        self.create_config()
+
+        if self.git:
+            Git.install(self.app_path)
+            self.install_gitignore()
+
+    @next_step("Copying Skeleton...\t\t")
+    def copy_skeleton(self):
+        # Copying the whole skeleton into the new path. Error if the path already exists
+        # TODO error handling here.
+        shutil.copytree(self.source_path, self.app_path)
+
+    @next_step("Creating config file...\t\t")
+    def create_config(self):
+        # Creating the configuration file using the command line arguments
+        with open(self.project_config_file, 'w') as fd:
+            fd.write(self.generate_config(self.config))
+
+    @next_step("Generating Gitignore...\t\t")
+    def install_gitignore(self):
+        shutil.copyfile(self.gitignore_template, self.gitignore_file)
 
 
 class PythonProject(Project):
-    def __init__(self, appname="app", template=None):
-        Project.__init__(self, appname, template)
+    def __init__(self, appname="app"):
+        Project.__init__(self, appname)
         self.virtualenv = False
 
     @property
@@ -51,12 +94,32 @@ class PythonProject(Project):
             brief_var['virtualenv_exe'] = Virtualenv.cmd()
         return brief_var
 
+    @property
+    def venv_dir(self):
+        return os.path.join(self.app_path, 'venv')
+
+    @property
+    def venv_bin_dir(self):
+        return os.path.join(self.app_path, 'venv', 'bin')
+
+    @property
+    def pip_file(self):
+        return os.path.join(self.venv_bin_dir, 'pip')
+
+    @property
+    def requirements_file(self):
+        return os.path.join(self.app_path, 'requirements.txt')
+
+    def install(self):
+        Project.install(self)
+        if self.virtualenv:
+            Virtualenv.install(self.venv_dir)
+            Virtualenv.install_dependencies(self.pip_file, self.requirements_file)
+
 
 class FlaskProject(PythonProject):
-    def __init__(self, appname="app", template=None):
-        if template is None:
-            template = FlaskProjectTemplate()
-        PythonProject.__init__(self, appname, template)
+    def __init__(self, appname="app"):
+        PythonProject.__init__(self, appname)
 
         self.secret_key = codecs.encode(os.urandom(32), 'hex').decode('utf-8')
         self.debug = True
@@ -64,7 +127,7 @@ class FlaskProject(PythonProject):
 
     @property
     def config_template(self):
-        return template_env.get_template(self.template.config_file)
+        return template_env.get_template(self.config_file)
 
     @property
     def config(self):
@@ -82,7 +145,7 @@ class FlaskProject(PythonProject):
             'virtualenv': self.virtualenv,
             'secret_key': self.secret_key,
             'path': self.app_path,
-            'database': self.template.database,
+            'database': self.database,
             'git': self.git,
         }
         # bower = None
@@ -91,3 +154,24 @@ class FlaskProject(PythonProject):
         if self.virtualenv:
             brief_var['virtualenv_exe'] = Virtualenv.cmd()
         return brief_var
+
+    @property
+    def static_dir(self):
+        return os.path.join(self.app_path, 'app', 'static')
+
+    @property
+    def project_config_file(self):
+        return os.path.join(self.app_path, 'config.py')
+
+    def install(self):
+        PythonProject.install(self)
+        if self.bower:
+            os.chdir(self.static_dir)
+            for dependency in self.bower:
+                Bower.install(dependency)
+
+
+class FlaskDbProject(FlaskProject):
+    skeleton_dir = "skel_db"
+    config_file = "config_db.jinja2"
+    database = True
