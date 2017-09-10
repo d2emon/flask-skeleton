@@ -59,6 +59,5 @@ class FlaskProject(PythonProject):
 
 
 class FlaskDbProject(FlaskProject):
-    skeleton_dir = "skel_db"
-    config_file = "config_db.jinja2"
+    template_name = "skel_db"
     database = True

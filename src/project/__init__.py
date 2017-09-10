@@ -15,9 +15,9 @@ cwd = os.getcwd()
 
 
 class Project():
-    source_dir = "skel"
+    template_name = "skel"
     config_file = "config.jinja2"
-    template_dir = config.SCRIPT_DIR
+    templates_dir = config.SCRIPT_DIR
     database = False
 
     def __init__(self, appname="app", **kwargs):
@@ -38,13 +38,17 @@ class Project():
         }
         return brief_var
 
+    @classmethod
+    def tpl_path(cls):
+        return os.path.join(cls.templates_dir, cls.template_name)
+
     @property
     def source_path(self):
-        return os.path.join(config.SCRIPT_DIR, self.source_dir)
+        return os.path.join(self.tpl_path, 'src')
 
     @classmethod
     def get_template(cls, filename):
-        template_loader = jinja2.FileSystemLoader(searchpath=cls.template_dir)
+        template_loader = jinja2.FileSystemLoader(searchpath=cls.tpl_path())
         template_env = jinja2.Environment(loader=template_loader)
         return template_env.get_template(filename)
 
@@ -57,7 +61,7 @@ class Project():
 
     @property
     def gitignore_template(self):
-        return os.path.join(config.SCRIPT_DIR, 'gitignore')
+        return os.path.join(self.templates_dir, 'gitignore')
 
     @property
     def gitignore_file(self):
