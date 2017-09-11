@@ -17,7 +17,10 @@ cwd = os.getcwd()
 class Project():
     template_name = "skel"
     config_file = "config.jinja2"
+
     templates_dir = config.SCRIPT_DIR
+
+    version = "0.1.0"
     database = False
 
     def __init__(self, appname="app", **kwargs):
@@ -46,6 +49,10 @@ class Project():
     def source_path(self):
         return os.path.join(self.tpl_path(), 'src')
 
+    @property
+    def version_file(self):
+        return os.path.join(self.app_path, 'VERSION')
+
     @classmethod
     def get_template(cls, filename):
         template_loader = jinja2.FileSystemLoader(searchpath=cls.tpl_path())
@@ -70,6 +77,7 @@ class Project():
     def install(self):
         self.copy_skeleton()
         self.create_config()
+        self.set_version()
 
         if self.git:
             Git.install(self.app_path, self.gitignore_template, self.gitignore_file)
@@ -85,3 +93,9 @@ class Project():
         # Creating the configuration file using the command line arguments
         with open(self.project_config_file, 'w') as fd:
             fd.write(self.generate_config(self.config))
+
+    @next_step("Setting version file...\t\t")
+    def set_version(self):
+        # Creating the configuration file using the command line arguments
+        with open(self.version_file, 'w') as fd:
+            fd.write(self.version)
