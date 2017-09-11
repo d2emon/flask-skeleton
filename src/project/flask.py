@@ -23,6 +23,8 @@ class FlaskProject(PythonProject):
     @property
     def config(self):
         return {
+            'appname': self.appname,
+            'description': self.description,
             'secret_key': self.secret_key,
             'debug': self.debug,
         }

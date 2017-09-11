@@ -17,6 +17,7 @@ cwd = os.getcwd()
 class Project():
     template_name = "skel"
     config_file = "config.jinja2"
+    readme_file = "readme.jinja2"
 
     templates_dir = config.SCRIPT_DIR
 
@@ -55,6 +56,10 @@ class Project():
     def version_file(self):
         return os.path.join(self.app_path, 'VERSION')
 
+    @property
+    def project_readme_file(self):
+        return os.path.join(self.app_path, 'README.md')
+
     @classmethod
     def get_template(cls, filename):
         template_loader = jinja2.FileSystemLoader(searchpath=cls.tpl_path())
@@ -62,11 +67,18 @@ class Project():
         return template_env.get_template(filename)
 
     @classmethod
-    def generate_config(cls, config):
-        template = cls.get_template(cls.config_file)
-        template_vars = config
+    def generate(cls, template_file, template_vars=dict()):
+        template = cls.get_template(template_file)
         template_vars.update(global_vars)
         return template.render(template_vars)
+
+    @classmethod
+    def generate_config(cls, config):
+        return cls.generate(cls.config_file, config)
+
+    @classmethod
+    def generate_readme(cls, config):
+        return cls.generate(cls.readme_file, config)
 
     @property
     def gitignore_template(self):
@@ -79,7 +91,8 @@ class Project():
     def install(self):
         self.copy_skeleton()
         self.create_config()
-        self.set_version()
+        self.create_version()
+        self.create_readme()
 
         if self.git:
             Git.install(self.app_path, self.gitignore_template, self.gitignore_file)
@@ -97,7 +110,11 @@ class Project():
             fd.write(self.generate_config(self.config))
 
     @next_step("Setting version file...\t\t")
-    def set_version(self):
-        # Creating the configuration file using the command line arguments
+    def create_version(self):
         with open(self.version_file, 'w') as fd:
             fd.write(self.version)
+
+    @next_step("Creating readme file...\t\t")
+    def create_readme(self):
+        with open(self.project_readme_file, 'w') as fd:
+            fd.write(self.generate_readme(self.config))
