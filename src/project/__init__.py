@@ -21,16 +21,18 @@ class Project():
     templates_dir = config.SCRIPT_DIR
 
     version = "0.1.0"
+    description = "Dummy description"
     database = False
 
-    def __init__(self, appname="app", **kwargs):
+    def __init__(self, appname="app", apppath="temp", **kwargs):
         self.appname = appname
+        self.apppath = apppath
 
         self.git = kwargs.get('git', False)
 
     @property
     def app_path(self):
-        return os.path.join(cwd, self.appname)
+        return os.path.join(cwd, self.apppath, self.appname)
 
     @property
     def brief_var(self):
