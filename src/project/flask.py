@@ -13,7 +13,6 @@ class FlaskProject(PythonProject):
         PythonProject.__init__(self, appname, **kwargs)
 
         self.secret_key = codecs.encode(os.urandom(32), 'hex').decode('utf-8')
-        self.debug = kwargs.get('debug', True)
         self.bower = kwargs.get('bower', [])
 
     @property
@@ -25,6 +24,9 @@ class FlaskProject(PythonProject):
         return {
             'appname': self.appname,
             'description': self.description,
+            'keywords': self.keywords,
+            'url': self.url,
+            'project': self,
             'secret_key': self.secret_key,
             'debug': self.debug,
         }

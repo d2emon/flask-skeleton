@@ -21,8 +21,6 @@ class Project():
 
     templates_dir = config.SCRIPT_DIR
 
-    version = "0.1.0"
-    description = "Dummy description"
     database = False
 
     def __init__(self, appname="app", apppath="temp", **kwargs):
@@ -30,6 +28,16 @@ class Project():
         self.apppath = apppath
 
         self.git = kwargs.get('git', False)
+
+        self.debug = kwargs.get('debug', True)
+        self.description = kwargs.get('description', "Description of %s" % (self.appname))
+        self.keywords = kwargs.get('keywords', ["flask", ])
+        self.version = kwargs.get('version', "0.1.0")
+        self.url = kwargs.get('url', "https://github.com/%s/%s#readme" % ("d2emon", self.appname))
+        self.account = kwargs.get('account', "d2emon")
+        self.author = kwargs.get('author', "Dmitry Kutsenko")
+        self.author_email = kwargs.get('author_email', "d2emonium@gmail.com")
+        self.license = kwargs.get('license', "GPL-3.0")
 
     @property
     def app_path(self):
