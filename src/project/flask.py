@@ -2,18 +2,23 @@ import os
 import codecs
 
 from external import Virtualenv, Bower
-from template import template_env
+from template import template_env, next_step
 from .python import PythonProject
 
 
 class FlaskProject(PythonProject):
     template_name = "flask"
+    npm_file = "package.jinja2"
 
     def __init__(self, appname="app", **kwargs):
         PythonProject.__init__(self, appname, **kwargs)
 
         self.secret_key = codecs.encode(os.urandom(32), 'hex').decode('utf-8')
         self.bower = kwargs.get('bower', [])
+
+    @property
+    def project_npm_file(self):
+        return os.path.join(self.app_path, 'package.json')
 
     @property
     def config_template(self):
@@ -60,8 +65,14 @@ class FlaskProject(PythonProject):
 
     def install(self):
         PythonProject.install(self)
+        self.create_npm()
         if self.bower:
             Bower.install(self.static_dir, self.bower)
+
+    @next_step("Creating npm package file...\t\t")
+    def create_npm(self):
+        with open(self.project_npm_file, 'w') as fd:
+            fd.write(self.generate(self.npm_file, self.config))
 
 
 class FlaskDbProject(FlaskProject):
