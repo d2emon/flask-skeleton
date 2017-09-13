@@ -61,7 +61,7 @@ class FlaskProject(PythonProject):
 
     @property
     def project_config_file(self):
-        return os.path.join(self.app_path, 'config.py')
+        return os.path.join(self.app_path, 'src', 'instance', 'config.py')
 
     def install(self):
         PythonProject.install(self)
